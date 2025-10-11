@@ -415,7 +415,7 @@
                     const response = await fetch('/api/notes');
                     if (!response.ok) throw new Error('Failed to load notes');
                     
-                    this.notes = await response.json();
+                        this.notes = await response.json();
                     this.renderNotesList();
                     this.hideMessage();
                 } catch (error) {
@@ -433,15 +433,108 @@
                     return;
                 }
 
-                notesList.innerHTML = this.notes.map(note => `
-                    <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
-                         data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
-                        <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
-                        <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
-                        <div class="note-date">${this.formatDate(note.updated_at)}</div>
-                    </div>
-                `).join('');
+                    // Render draggable note items. We'll add drag handlers after inserting.
+                    notesList.innerHTML = this.notes.map(note => `
+                        <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
+                             data-note-id="${note.id}" draggable="true">
+                            <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
+                            <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
+                            <div class="note-date">${this.formatDate(note.updated_at)}</div>
+                        </div>
+                    `).join('');
+
+                    // Attach drag-and-drop handlers
+                    this.attachDragHandlers();
             }
+
+                attachDragHandlers() {
+                    const list = document.getElementById('notesList');
+                    let dragSrcEl = null;
+
+                    function handleDragStart(e) {
+                        dragSrcEl = this;
+                        e.dataTransfer.effectAllowed = 'move';
+                        try { e.dataTransfer.setData('text/plain', this.dataset.noteId); } catch (err) {}
+                        this.classList.add('dragging');
+                    }
+
+                    function handleDragOver(e) {
+                        if (e.preventDefault) e.preventDefault(); // Necessary. Allows us to drop.
+                        e.dataTransfer.dropEffect = 'move';
+                        return false;
+                    }
+
+                    function handleDragEnter() {
+                        this.classList.add('over');
+                    }
+
+                    function handleDragLeave() {
+                        this.classList.remove('over');
+                    }
+
+                    function handleDrop(e) {
+                        if (e.stopPropagation) e.stopPropagation(); // stops the browser from redirecting.
+                        const srcId = e.dataTransfer.getData('text/plain') || (dragSrcEl && dragSrcEl.dataset.noteId);
+                        const destId = this.dataset.noteId;
+                        if (srcId && destId && srcId !== destId) {
+                            // reorder in DOM and in this.notes
+                            noteTaker.reorderLocal(parseInt(srcId), parseInt(destId));
+                        }
+                        return false;
+                    }
+
+                    function handleDragEnd() {
+                        document.querySelectorAll('.note-item').forEach(item => {
+                            item.classList.remove('over');
+                            item.classList.remove('dragging');
+                        });
+                    }
+
+                    const items = list.querySelectorAll('.note-item');
+                    items.forEach(item => {
+                        item.addEventListener('dragstart', handleDragStart, false);
+                        item.addEventListener('dragenter', handleDragEnter, false);
+                        item.addEventListener('dragover', handleDragOver, false);
+                        item.addEventListener('dragleave', handleDragLeave, false);
+                        item.addEventListener('drop', handleDrop, false);
+                        item.addEventListener('dragend', handleDragEnd, false);
+
+                        // Keep click behavior for selection
+                        item.addEventListener('click', () => noteTaker.selectNote(parseInt(item.dataset.noteId)));
+                    });
+                }
+
+                reorderLocal(srcId, destId) {
+                    // Move src note to the position of dest note (before dest)
+                    const srcIndex = this.notes.findIndex(n => n.id === srcId);
+                    const destIndex = this.notes.findIndex(n => n.id === destId);
+                    if (srcIndex === -1 || destIndex === -1) return;
+
+                    const [moved] = this.notes.splice(srcIndex, 1);
+                    // Insert at destIndex. If dragging down, after removing earlier index, adjust.
+                    const insertIndex = destIndex < srcIndex ? destIndex : destIndex + 1;
+                    this.notes.splice(insertIndex, 0, moved);
+
+                    // Re-render and persist order
+                    this.renderNotesList();
+                    this.persistOrder();
+                }
+
+                async persistOrder() {
+                    try {
+                        const ids = this.notes.map(n => n.id).filter(Boolean);
+                        const response = await fetch('/api/notes/reorder', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order: ids })
+                        });
+                        if (!response.ok) throw new Error('Failed to persist order');
+                        // Optionally refresh notes to get updated timestamps
+                        // await this.loadNotes();
+                    } catch (error) {
+                        this.showMessage(`Error saving order: ${error.message}`, 'error');
+                    }
+                }
 
             async selectNote(noteId) {
                 const note = this.notes.find(n => n.id === noteId);
@@ -588,12 +681,15 @@
 
                 notesList.innerHTML = filteredNotes.map(note => `
                     <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
-                         data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
+                         data-note-id="${note.id}" draggable="true">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
                         <div class="note-date">${this.formatDate(note.updated_at)}</div>
                     </div>
                 `).join('');
+
+                // Attach drag handlers for filtered list as well
+                this.attachDragHandlers();
             }
 
             showMessage(message, type) {
