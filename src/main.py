@@ -45,6 +45,25 @@ with app.app_context():
             except Exception:
                 # If the alter fails, ignore; app will still function but ordering may not persist
                 pass
+        # Add tags, event_date, event_time if missing
+        if 'tags' not in cols:
+            try:
+                cur.execute('ALTER TABLE note ADD COLUMN tags TEXT;')
+                conn.commit()
+            except Exception:
+                pass
+        if 'event_date' not in cols:
+            try:
+                cur.execute("ALTER TABLE note ADD COLUMN event_date VARCHAR(50);")
+                conn.commit()
+            except Exception:
+                pass
+        if 'event_time' not in cols:
+            try:
+                cur.execute("ALTER TABLE note ADD COLUMN event_time VARCHAR(50);")
+                conn.commit()
+            except Exception:
+                pass
     except Exception:
         pass
     finally:

@@ -322,6 +322,49 @@
         .notes-list::-webkit-scrollbar-thumb:hover {
             background: #5a6fd8;
         }
+
+        /* Modal styles for Generate from Text */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal.open { display: flex; }
+
+        .modal-card {
+            background: white;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 100%;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .modal-card textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -335,6 +378,7 @@
             <div class="sidebar">
                 <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search notes...">
                 <button class="new-note-btn" id="newNoteBtn">✨ New Note</button>
+                <button class="new-note-btn" id="generateNoteBtn" style="margin-top:10px;background:linear-gradient(135deg,#4CAF50 0%,#2E7D32 100%);">🧠 Generate from Text</button>
                 
                 <div class="notes-list" id="notesList">
                     <div class="loading">Loading notes...</div>
@@ -361,6 +405,7 @@
                             <option value="Italian">Italian</option>
                         </select>
                         <button class="btn" id="translateBtn">🌐 Translate</button>
+                        <button class="btn" id="generateTagsBtn" title="Generate tags from content">🏷️ Generate Tags</button>
                     </div>
                 </div>
 
@@ -375,6 +420,21 @@
                     <div class="form-group">
                         <label class="form-label" for="noteContent">Content</label>
                         <textarea class="form-textarea" id="noteContent" placeholder="Start writing your note..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="noteTags">Tags (comma separated)</label>
+                        <input type="text" class="form-input" id="noteTags" placeholder="e.g. ideas, meeting" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="eventDate">Event Date</label>
+                        <input type="date" class="form-input" id="eventDate" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="eventTime">Event Time</label>
+                        <input type="time" class="form-input" id="eventTime" />
                     </div>
                 </div>
 
@@ -405,6 +465,8 @@
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
                 document.getElementById('translateBtn').addEventListener('click', () => this.translateCurrentNote());
+                document.getElementById('generateNoteBtn').addEventListener('click', () => this.openGenerateModal());
+                document.getElementById('generateTagsBtn').addEventListener('click', () => this.generateTagsForCurrent());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
                 
                 // Auto-save on content change (debounced)
@@ -461,6 +523,80 @@
                     }
                 } catch (err) {
                     this.showMessage(`Error translating note: ${err.message}`, 'error');
+                }
+            }
+
+            openGenerateModal() {
+                document.getElementById('generateText').value = '';
+                document.getElementById('generateLang').value = 'English';
+                document.getElementById('generateModal').classList.add('open');
+                // bind modal buttons
+                document.getElementById('generateCancel').onclick = () => this.closeGenerateModal();
+                document.getElementById('generateSubmit').onclick = () => this.submitGenerateModal();
+            }
+
+            closeGenerateModal() {
+                document.getElementById('generateModal').classList.remove('open');
+            }
+
+            async submitGenerateModal() {
+                const title = document.getElementById('generateText').value.trim();
+                const lang = document.getElementById('generateLang').value || 'English';
+                if (!title) {
+                    this.showMessage('Please provide a short title to generate from', 'error');
+                    return;
+                }
+
+                try {
+                    this.showMessage('Generating note...', 'loading');
+                    const response = await fetch('/api/notes/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, lang })
+                    });
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || 'Failed to generate note');
+                    }
+                    const created = await response.json();
+                    this.hideMessage();
+                    this.closeGenerateModal();
+
+                    // Add to notes and select
+                    this.notes.unshift(created);
+                    this.renderNotesList();
+                    this.selectNote(created.id);
+                    this.showMessage('Generated note created.', 'success');
+                } catch (err) {
+                    this.showMessage(`Error generating note: ${err.message}`, 'error');
+                }
+            }
+
+            async generateTagsForCurrent() {
+                if (!this.currentNote || !this.currentNote.id) {
+                    this.showMessage('Select a note first', 'error');
+                    return;
+                }
+
+                try {
+                    this.showMessage('Generating tags...', 'loading');
+                    const langSelect = document.getElementById('translateLangSelect');
+                    const lang = langSelect ? langSelect.value : 'English';
+                    const resp = await fetch(`/api/notes/${this.currentNote.id}/generate-tags`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lang })
+                    });
+                    if (!resp.ok) throw new Error('Failed to generate tags');
+                    const data = await resp.json();
+                    const tags = data.tags || [];
+                    document.getElementById('noteTags').value = tags.join(', ');
+                    // Save the note with new tags
+                    this.currentNote.tags = tags;
+                    await this.saveNote();
+                    this.showMessage('Tags generated and saved.', 'success');
+                } catch (err) {
+                    this.showMessage(`Error generating tags: ${err.message}`, 'error');
                 }
             }
 
@@ -603,6 +739,9 @@
                 
                 document.getElementById('noteTitle').value = note.title || '';
                 document.getElementById('noteContent').value = note.content || '';
+                document.getElementById('noteTags').value = (note.tags && Array.isArray(note.tags)) ? note.tags.join(', ') : (note.tags || '');
+                document.getElementById('eventDate').value = note.event_date || '';
+                document.getElementById('eventTime').value = note.event_time || '';
                 document.getElementById('editorTitle').textContent = note.title || 'Untitled Note';
             }
 
@@ -657,7 +796,10 @@
                 try {
                     const noteData = {
                         title: title || 'Untitled',
-                        content: content
+                        content: content,
+                    tags: document.getElementById('noteTags').value.split(',').map(t => t.trim()).filter(Boolean),
+                    event_date: document.getElementById('eventDate').value || null,
+                    event_time: document.getElementById('eventTime').value || null
                     };
 
                     let response;
@@ -789,6 +931,28 @@
         // Initialize the app
         const noteTaker = new NoteTaker();
     </script>
+    <!-- Generate Modal -->
+    <div class="modal" id="generateModal">
+        <div class="modal-card">
+            <h3>Generate Note from Text</h3>
+            <label for="generateText">Enter a short title (this will be expanded to note content):</label>
+            <input id="generateText" placeholder="e.g. Meeting with John about project" style="padding:10px;border-radius:8px;border:1px solid #ddd;width:100%" />
+            <div style="display:flex;align-items:center;gap:10px;">
+                <label for="generateLang">Language</label>
+                <select id="generateLang" style="padding:6px;border-radius:6px;border:1px solid #ddd;font-size:14px">
+                    <option value="English">English</option>
+                    <option value="French">French</option>
+                    <option value="Chinese">Chinese</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="German">German</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="generateCancel">Cancel</button>
+                <button class="btn btn-save" id="generateSubmit">Generate & Save</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 

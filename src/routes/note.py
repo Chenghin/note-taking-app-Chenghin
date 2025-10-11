@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from src.models.note import Note, db
 from src.llm import translate_text
+from src.llm import extract_structured_notes, generate_notes_from_title
 
 note_bp = Blueprint('note', __name__)
 
@@ -20,7 +21,14 @@ def create_note():
             return jsonify({'error': 'Title and content are required'}), 400
         # Determine highest current order and set the new note to appear first
         max_order = db.session.query(db.func.max(Note.order)).scalar() or 0
-        note = Note(title=data['title'], content=data['content'], order=(max_order + 1))
+        tags = data.get('tags')
+        try:
+            tags_json = __import__('json').dumps(tags) if tags is not None else None
+        except Exception:
+            tags_json = None
+        event_date = data.get('event_date')
+        event_time = data.get('event_time')
+        note = Note(title=data['title'], content=data['content'], order=(max_order + 1), tags=tags_json, event_date=event_date, event_time=event_time)
         db.session.add(note)
         db.session.commit()
         return jsonify(note.to_dict()), 201
@@ -46,6 +54,15 @@ def update_note(note_id):
         
         note.title = data.get('title', note.title)
         note.content = data.get('content', note.content)
+        tags = data.get('tags')
+        if tags is not None:
+            try:
+                note.tags = __import__('json').dumps(tags)
+            except Exception:
+                note.tags = None
+        # event date/time
+        note.event_date = data.get('event_date', note.event_date)
+        note.event_time = data.get('event_time', note.event_time)
         db.session.commit()
         return jsonify(note.to_dict())
     except Exception as e:
@@ -100,6 +117,73 @@ def translate_note(note_id):
         translated_content = translate_text(note.content or '', target_language=target)
         return jsonify({'translated_title': translated_title, 'translated': translated_content}), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@note_bp.route('/notes/<int:note_id>/generate-tags', methods=['POST'])
+def generate_tags(note_id):
+    """Generate tags for a note using LLM and persist them.
+
+    Optional JSON body: { "lang": "English" }
+    """
+    note = Note.query.get_or_404(note_id)
+    data = request.json or {}
+    lang = data.get('lang', 'English')
+    try:
+        structured = extract_structured_notes(note.content or note.title or '', lang=lang)
+        tags = structured.get('Tags') or structured.get('tags') or []
+        if tags:
+            note.tags = __import__('json').dumps(tags)
+            db.session.commit()
+        return jsonify({'tags': tags}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@note_bp.route('/notes/generate', methods=['POST'])
+def generate_note():
+    """Generate a structured note from free-text using LLM and save it.
+
+    Expected JSON body: { "text": "...", "lang": "English" }
+    Returns the created note JSON.
+    """
+    try:
+        data = request.json or {}
+        title = data.get('title', '').strip()
+        lang = data.get('lang', 'English')
+        if title:
+            # Generate content from a short title
+            content = generate_notes_from_title(title, lang=lang)
+        else:
+            text = data.get('text', '').strip()
+            if not text:
+                return jsonify({'error': 'No title or text provided'}), 400
+            structured = extract_structured_notes(text, lang=lang)
+            # structured expected to contain Title and Notes
+            title = structured.get('Title') or (text[:50] + '...')
+            content = structured.get('Notes') or text
+
+        # Determine highest current order and set the new note to appear first
+        max_order = db.session.query(db.func.max(Note.order)).scalar() or 0
+        note = Note(title=title, content=content, order=(max_order + 1))
+        db.session.add(note)
+        db.session.commit()
+
+        # Attempt to generate tags using extract_structured_notes on the generated content
+        try:
+            structured = extract_structured_notes(content, lang=lang)
+            tags = structured.get('Tags') or structured.get('tags') or []
+            if tags:
+                note.tags = __import__('json').dumps(tags)
+                db.session.commit()
+        except Exception:
+            # ignore tag generation errors
+            pass
+
+        return jsonify(note.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @note_bp.route('/notes/<int:note_id>', methods=['DELETE'])
