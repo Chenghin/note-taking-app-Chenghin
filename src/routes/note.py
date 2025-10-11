@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from src.models.note import Note, db
+from src.llm import translate_text
 
 note_bp = Blueprint('note', __name__)
 
@@ -81,6 +82,24 @@ def reorder_notes():
         return jsonify({'success': True}), 200
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@note_bp.route('/notes/<int:note_id>/translate', methods=['POST'])
+def translate_note(note_id):
+    """Translate a specific note's content using LLM helper.
+
+    Expected JSON body: { "target_language": "French" }
+    Returns the translated content but does not overwrite the original content.
+    """
+    note = Note.query.get_or_404(note_id)
+    data = request.json or {}
+    target = data.get('target_language', 'French')
+    try:
+        translated_title = translate_text(note.title or '', target_language=target)
+        translated_content = translate_text(note.content or '', target_language=target)
+        return jsonify({'translated_title': translated_title, 'translated': translated_content}), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @note_bp.route('/notes/<int:note_id>', methods=['DELETE'])

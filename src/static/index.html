@@ -344,9 +344,23 @@
             <div class="note-editor">
                 <div class="editor-header">
                     <h2 class="editor-title" id="editorTitle">Select a note to edit</h2>
-                    <div class="editor-actions" id="editorActions" style="display: none;">
+                    <div class="editor-actions" id="editorActions" style="display: none; align-items: center;">
                         <button class="btn btn-save" id="saveBtn">💾 Save</button>
                         <button class="btn btn-delete" id="deleteBtn">🗑️ Delete</button>
+                        <label for="translateLangSelect" style="display:inline-block;margin-left:8px;margin-right:6px;color:#fff;font-weight:600;">Language</label>
+                        <select id="translateLangSelect" style="padding:6px;border-radius:6px;border:1px solid #ddd;font-size:14px">
+                            <option value="French">French</option>
+                            <option value="Chinese">Chinese</option>
+                            <option value="Spanish">Spanish</option>
+                            <option value="German">German</option>
+                            <option value="Japanese">Japanese</option>
+                            <option value="Arabic">Arabic</option>
+                            <option value="Hindi">Hindi</option>
+                            <option value="Portuguese">Portuguese</option>
+                            <option value="Russian">Russian</option>
+                            <option value="Italian">Italian</option>
+                        </select>
+                        <button class="btn" id="translateBtn">🌐 Translate</button>
                     </div>
                 </div>
 
@@ -390,6 +404,7 @@
                 document.getElementById('newNoteBtn').addEventListener('click', () => this.createNewNote());
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
+                document.getElementById('translateBtn').addEventListener('click', () => this.translateCurrentNote());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
                 
                 // Auto-save on content change (debounced)
@@ -405,6 +420,48 @@
                 
                 document.getElementById('noteTitle').addEventListener('input', autoSave);
                 document.getElementById('noteContent').addEventListener('input', autoSave);
+            }
+
+            async translateCurrentNote() {
+                if (!this.currentNote || !this.currentNote.id) {
+                    this.showMessage('Select a saved note to translate', 'error');
+                    return;
+                }
+
+                const targetSelect = document.getElementById('translateLangSelect');
+                const target = targetSelect ? targetSelect.value : 'French';
+
+                try {
+                    this.showMessage('Translating...', 'loading');
+                    const response = await fetch(`/api/notes/${this.currentNote.id}/translate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target_language: target })
+                    });
+                    if (!response.ok) throw new Error('Translation failed');
+                    const data = await response.json();
+                    this.hideMessage();
+
+                    if (data.translated || data.translated_title) {
+                        // Automatically replace title and content with translation and save (no confirmation)
+                        if (data.translated_title) {
+                            document.getElementById('noteTitle').value = data.translated_title;
+                            this.currentNote.title = data.translated_title;
+                        }
+                        if (data.translated) {
+                            document.getElementById('noteContent').value = data.translated;
+                            this.currentNote.content = data.translated;
+                        }
+                        await this.saveNote();
+                        this.showMessage('Translation applied and saved.', 'success');
+                    } else if (data.error) {
+                        this.showMessage(`Error translating: ${data.error}`, 'error');
+                    } else {
+                        this.showMessage('No translation returned', 'error');
+                    }
+                } catch (err) {
+                    this.showMessage(`Error translating note: ${err.message}`, 'error');
+                }
             }
 
             async loadNotes() {
