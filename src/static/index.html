@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NoteTaker - Your Personal Note Manager</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <!-- Flatpickr datepicker (English) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <style>
         * {
             margin: 0;
@@ -90,7 +93,7 @@
         .new-note-btn {
             width: 100%;
             padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #ff8c42 0%, #ff6b00 100%);
             color: white;
             border: none;
             border-radius: 10px;
@@ -168,37 +171,66 @@
 
         .editor-actions {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+            align-items: center;
+            background: #f4f6fa;
+            border-radius: 10px;
+            padding: 8px 16px;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.07);
         }
 
         .btn {
-            padding: 8px 16px;
+            padding: 8px 18px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 15px;
+            font-weight: 600;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 4px rgba(102,126,234,0.08);
         }
 
         .btn-save {
-            background: #28a745;
-            color: white;
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+            color: #fff;
         }
-
         .btn-save:hover {
-            background: #218838;
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, #218838 0%, #28a745 100%);
+            transform: translateY(-1px) scale(1.04);
         }
-
         .btn-delete {
-            background: #dc3545;
-            color: white;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: #fff;
         }
-
         .btn-delete:hover {
-            background: #c82333;
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, #c82333 0%, #dc3545 100%);
+            transform: translateY(-1px) scale(1.04);
+        }
+        .btn-action {
+            background: linear-gradient(135deg, #20c997 0%, #0ca678 100%); /* teal */
+            color: #fff;
+        }
+        .btn-action:hover {
+            background: linear-gradient(135deg, #0ca678 0%, #20c997 100%);
+            transform: translateY(-1px) scale(1.04);
+        }
+        .editor-actions label {
+            margin: 0 0 0 10px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .editor-actions select {
+            padding: 7px 12px;
+            border-radius: 7px;
+            border: 1.5px solid #e1e5e9;
+            font-size: 14px;
+            margin-left: 2px;
+            margin-right: 8px;
+            background: #f8f9fa;
         }
 
         .form-group {
@@ -219,6 +251,13 @@
             border-radius: 10px;
             font-size: 16px;
             transition: border-color 0.3s ease;
+        }
+
+        /* Ensure time input matches other form inputs */
+        input[type="time"], input[type="date"], .form-input {
+            font-family: inherit;
+            font-size: 16px;
+            color: #333;
         }
 
         .form-input:focus {
@@ -337,6 +376,15 @@
 
         .modal.open { display: flex; }
 
+        /* Unsaved changes modal */
+        #unsavedModal .modal-card {
+            max-width: 400px;
+            text-align: center;
+        }
+        #unsavedModal .modal-actions {
+            justify-content: center;
+        }
+
         .modal-card {
             background: white;
             border-radius: 12px;
@@ -386,13 +434,13 @@
             </div>
 
             <div class="note-editor">
+                <h2 class="editor-title" id="editorTitle">Select a note to edit</h2>
                 <div class="editor-header">
-                    <h2 class="editor-title" id="editorTitle">Select a note to edit</h2>
-                    <div class="editor-actions" id="editorActions" style="display: none; align-items: center;">
-                        <button class="btn btn-save" id="saveBtn">💾 Save</button>
-                        <button class="btn btn-delete" id="deleteBtn">🗑️ Delete</button>
-                        <label for="translateLangSelect" style="display:inline-block;margin-left:8px;margin-right:6px;color:#fff;font-weight:600;">Language</label>
-                        <select id="translateLangSelect" style="padding:6px;border-radius:6px;border:1px solid #ddd;font-size:14px">
+                    <div class="editor-actions" id="editorActions" style="display: none;">
+                        <button class="btn btn-save" id="saveBtn" title="Save note"><span>💾</span>Save</button>
+                        <button class="btn btn-delete" id="deleteBtn" title="Delete note"><span>🗑️</span>Delete</button>
+                        <label for="translateLangSelect">Language</label>
+                        <select id="translateLangSelect">
                             <option value="French">French</option>
                             <option value="Chinese">Chinese</option>
                             <option value="Spanish">Spanish</option>
@@ -404,8 +452,8 @@
                             <option value="Russian">Russian</option>
                             <option value="Italian">Italian</option>
                         </select>
-                        <button class="btn" id="translateBtn">🌐 Translate</button>
-                        <button class="btn" id="generateTagsBtn" title="Generate tags from content">🏷️ Generate Tags</button>
+                        <button class="btn btn-action" id="translateBtn" title="Translate note"><span>🌐</span>Translate</button>
+                        <button class="btn btn-action" id="generateTagsBtn" title="Generate tags from content"><span>🏷️</span>Generate Tags</button>
                     </div>
                 </div>
 
@@ -429,7 +477,7 @@
 
                     <div class="form-group">
                         <label class="form-label" for="eventDate">Event Date</label>
-                        <input type="date" class="form-input" id="eventDate" />
+                        <input type="text" class="form-input" id="eventDate" placeholder="YYYY-MM-DD" />
                     </div>
 
                     <div class="form-group">
@@ -448,10 +496,12 @@
 
     <script>
         class NoteTaker {
+            pendingAction = null; // store action to run after unsaved modal
             constructor() {
                 this.notes = [];
                 this.currentNote = null;
                 this.isLoading = false;
+                this.unsavedChanges = false;
                 this.init();
             }
 
@@ -461,14 +511,22 @@
             }
 
             bindEvents() {
-                document.getElementById('newNoteBtn').addEventListener('click', () => this.createNewNote());
+                document.getElementById('newNoteBtn').addEventListener('click', () => this.handleCreateNewNote());
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
                 document.getElementById('translateBtn').addEventListener('click', () => this.translateCurrentNote());
                 document.getElementById('generateNoteBtn').addEventListener('click', () => this.openGenerateModal());
                 document.getElementById('generateTagsBtn').addEventListener('click', () => this.generateTagsForCurrent());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
-                
+
+                // Track unsaved changes
+                const markUnsaved = () => { this.unsavedChanges = true; };
+                document.getElementById('noteTitle').addEventListener('input', markUnsaved);
+                document.getElementById('noteContent').addEventListener('input', markUnsaved);
+                document.getElementById('noteTags').addEventListener('input', markUnsaved);
+                document.getElementById('eventDate').addEventListener('input', markUnsaved);
+                document.getElementById('eventTime').addEventListener('input', markUnsaved);
+
                 // Auto-save on content change (debounced)
                 let saveTimeout;
                 const autoSave = () => {
@@ -479,9 +537,45 @@
                         }
                     }, 2000);
                 };
-                
                 document.getElementById('noteTitle').addEventListener('input', autoSave);
                 document.getElementById('noteContent').addEventListener('input', autoSave);
+            }
+
+            // Helper to check for unsaved changes and prompt with custom modal
+            async checkUnsavedChanges(actionIfProceed) {
+                if (!this.unsavedChanges) return true;
+                return new Promise((resolve) => {
+                    this.pendingAction = actionIfProceed;
+                    const modal = document.getElementById('unsavedModal');
+                    modal.classList.add('open');
+                    // Button handlers
+                    document.getElementById('unsavedSave').onclick = async () => {
+                        await this.saveNote();
+                        this.unsavedChanges = false;
+                        modal.classList.remove('open');
+                        if (this.pendingAction) this.pendingAction();
+                        resolve(false); // prevent double action
+                    };
+                    document.getElementById('unsavedDiscard').onclick = () => {
+                        this.unsavedChanges = false;
+                        modal.classList.remove('open');
+                        if (this.pendingAction) this.pendingAction();
+                        resolve(false);
+                    };
+                    document.getElementById('unsavedCancel').onclick = () => {
+                        modal.classList.remove('open');
+                        this.pendingAction = null;
+                        resolve(false);
+                    };
+                });
+            }
+
+            async handleCreateNewNote() {
+                if (this.unsavedChanges) {
+                    await this.checkUnsavedChanges(() => this.createNewNote());
+                } else {
+                    this.createNewNote();
+                }
             }
 
             async translateCurrentNote() {
@@ -730,19 +824,27 @@
                 }
 
             async selectNote(noteId) {
+                if (this.currentNote && this.currentNote.id === noteId) return;
+                if (this.unsavedChanges) {
+                    await this.checkUnsavedChanges(() => this._doSelectNote(noteId));
+                } else {
+                    this._doSelectNote(noteId);
+                }
+            }
+
+            _doSelectNote(noteId) {
                 const note = this.notes.find(n => n.id === noteId);
                 if (!note) return;
-
                 this.currentNote = note;
                 this.showEditor();
                 this.renderNotesList(); // Re-render to update active state
-                
                 document.getElementById('noteTitle').value = note.title || '';
                 document.getElementById('noteContent').value = note.content || '';
                 document.getElementById('noteTags').value = (note.tags && Array.isArray(note.tags)) ? note.tags.join(', ') : (note.tags || '');
                 document.getElementById('eventDate').value = note.event_date || '';
                 document.getElementById('eventTime').value = note.event_time || '';
                 document.getElementById('editorTitle').textContent = note.title || 'Untitled Note';
+                this.unsavedChanges = false;
             }
 
             createNewNote() {
@@ -797,9 +899,9 @@
                     const noteData = {
                         title: title || 'Untitled',
                         content: content,
-                    tags: document.getElementById('noteTags').value.split(',').map(t => t.trim()).filter(Boolean),
-                    event_date: document.getElementById('eventDate').value || null,
-                    event_time: document.getElementById('eventTime').value || null
+                        tags: document.getElementById('noteTags').value.split(',').map(t => t.trim()).filter(Boolean),
+                        event_date: document.getElementById('eventDate').value || null,
+                        event_time: document.getElementById('eventTime').value || null
                     };
 
                     let response;
@@ -823,7 +925,7 @@
 
                     const savedNote = await response.json();
                     this.currentNote = savedNote;
-                    
+
                     // Update notes list
                     const existingIndex = this.notes.findIndex(n => n.id === savedNote.id);
                     if (existingIndex >= 0) {
@@ -831,10 +933,10 @@
                     } else {
                         this.notes.unshift(savedNote);
                     }
-                    
+
                     this.renderNotesList();
                     document.getElementById('editorTitle').textContent = savedNote.title;
-                    
+                    this.unsavedChanges = false;
                     if (!isAutoSave) {
                         this.showMessage('Note saved successfully!', 'success');
                     }
@@ -930,7 +1032,27 @@
 
         // Initialize the app
         const noteTaker = new NoteTaker();
+        // Initialize flatpickr for English calendar on Event Date
+        if (window.flatpickr) {
+            flatpickr('#eventDate', {
+                dateFormat: 'Y-m-d',
+                locale: 'en',
+                allowInput: true
+            });
+        }
     </script>
+    <!-- Unsaved Changes Modal -->
+    <div class="modal" id="unsavedModal">
+        <div class="modal-card">
+            <h3>Unsaved Changes</h3>
+            <p>You have unsaved changes. What would you like to do?</p>
+            <div class="modal-actions">
+                <button class="btn btn-save" id="unsavedSave">Save</button>
+                <button class="btn btn-action" id="unsavedDiscard">Discard</button>
+                <button class="btn btn-delete" id="unsavedCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
     <!-- Generate Modal -->
     <div class="modal" id="generateModal">
         <div class="modal-card">
