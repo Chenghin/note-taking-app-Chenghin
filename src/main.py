@@ -9,6 +9,7 @@ from src.models.user import db
 from src.routes.user import user_bp
 from src.routes.note import note_bp
 from src.models.note import Note
+import sqlite3
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -30,6 +31,47 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 with app.app_context():
     db.create_all()
+    # Ensure the new 'order' column exists in the note table for older databases
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        # Check if 'order' column exists by querying PRAGMA table_info
+        cur.execute("PRAGMA table_info(note);")
+        cols = [r[1] for r in cur.fetchall()]
+        if 'order' not in cols:
+            try:
+                cur.execute('ALTER TABLE note ADD COLUMN "order" INTEGER DEFAULT 0;')
+                conn.commit()
+            except Exception:
+                # If the alter fails, ignore; app will still function but ordering may not persist
+                pass
+        # Add tags, event_date, event_time if missing
+        if 'tags' not in cols:
+            try:
+                cur.execute('ALTER TABLE note ADD COLUMN tags TEXT;')
+                conn.commit()
+            except Exception:
+                pass
+        if 'event_date' not in cols:
+            try:
+                cur.execute("ALTER TABLE note ADD COLUMN event_date VARCHAR(50);")
+                conn.commit()
+            except Exception:
+                pass
+        if 'event_time' not in cols:
+            try:
+                cur.execute("ALTER TABLE note ADD COLUMN event_time VARCHAR(50);")
+                conn.commit()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except Exception:
+            pass
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
