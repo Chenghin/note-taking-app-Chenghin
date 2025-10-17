@@ -1,6 +1,12 @@
-# test case generation
-when you write python code, also generate unit test for the code.
-put the unit test in a floder /tests
+# Operating environment
+
+All command line executions should be run in the venv environment of conda's software environment
+You can use the following command to ensure it.
+   ```bash
+   conda activate software
+   python -m venv venv
+   venv\Scripts\activate
+   ```
 
 
 # Rules for updating the apps
@@ -30,40 +36,3 @@ When user ask to add a feature or modify a feature, think about which part of th
 1. Update the database if needed
 2. Update the API if needed
 3. Update the frontend if needed
-
-
-# LLM API Instructions
-when writiing program to call LLM API, use the following API.
-Example:
-'''python
-import os
-from openai import OpenAI
-
-token = os.environ["GITHUB_TOKEN"]
-endpoint = "https://models.github.ai/inference"
-model = "openai/gpt-4.1-mini"
-
-client = OpenAI(
-    base_url=endpoint,
-    api_key=token,
-)
-
-response = client.chat.completions.create(
-    messages=[
-        {
-            "role": "system",
-            "content": "You are a helpful assistant.",
-        },
-        {
-            "role": "user",
-            "content": "What is the capital of France?",
-        }
-    ],
-    temperature=1.0,
-    top_p=1.0,
-    model=model
-)
-
-print(response.choices[0].message.content)
-
-'''
