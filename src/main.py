@@ -5,11 +5,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
-from src.models.user import db
 from src.routes.user import user_bp
 from src.routes.note import note_bp
-from src.models.note import Note
-import sqlite3
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -17,61 +18,17 @@ app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
 # Enable CORS for all routes
 CORS(app)
 
-# register blueprints
+# Register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(note_bp, url_prefix='/api')
-# configure database to use repository-root `database/app.db`
-ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-DB_PATH = os.path.join(ROOT_DIR, 'database', 'app.db')
-# ensure database directory exists
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-with app.app_context():
-    db.create_all()
-    # Ensure the new 'order' column exists in the note table for older databases
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
-        # Check if 'order' column exists by querying PRAGMA table_info
-        cur.execute("PRAGMA table_info(note);")
-        cols = [r[1] for r in cur.fetchall()]
-        if 'order' not in cols:
-            try:
-                cur.execute('ALTER TABLE note ADD COLUMN "order" INTEGER DEFAULT 0;')
-                conn.commit()
-            except Exception:
-                # If the alter fails, ignore; app will still function but ordering may not persist
-                pass
-        # Add tags, event_date, event_time if missing
-        if 'tags' not in cols:
-            try:
-                cur.execute('ALTER TABLE note ADD COLUMN tags TEXT;')
-                conn.commit()
-            except Exception:
-                pass
-        if 'event_date' not in cols:
-            try:
-                cur.execute("ALTER TABLE note ADD COLUMN event_date VARCHAR(50);")
-                conn.commit()
-            except Exception:
-                pass
-        if 'event_time' not in cols:
-            try:
-                cur.execute("ALTER TABLE note ADD COLUMN event_time VARCHAR(50);")
-                conn.commit()
-            except Exception:
-                pass
-    except Exception:
-        pass
-    finally:
-        try:
-            cur.close()
-            conn.close()
-        except Exception:
-            pass
+# Test Supabase connection on startup
+try:
+    from src.config import supabase
+    print("✓ Supabase client initialized successfully")
+except Exception as e:
+    print(f"✗ Failed to initialize Supabase client: {e}")
+    print("Make sure SUPABASE_URL and SUPABASE_ANON_KEY are set in your .env file")
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
