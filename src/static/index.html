@@ -441,6 +441,7 @@
                         <button class="btn btn-delete" id="deleteBtn" title="Delete note"><span>🗑️</span>Delete</button>
                         <label for="translateLangSelect">Language</label>
                         <select id="translateLangSelect">
+                            <option value="English">English</option>
                             <option value="French">French</option>
                             <option value="Chinese">Chinese</option>
                             <option value="Spanish">Spanish</option>
@@ -598,8 +599,13 @@
                     const data = await response.json();
                     this.hideMessage();
 
-                    if (data.translated || data.translated_title) {
-                        // Automatically replace title and content with translation and save (no confirmation)
+                    if (data.no_translation_needed) {
+                        this.showMessage(`Content is already in ${target}. No translation needed.`, 'info');
+                        return;
+                    }
+
+                    if (data.translated || data.translated_title || data.translated_tags) {
+                        // Automatically replace title, content, and tags with translation and save (no confirmation)
                         if (data.translated_title) {
                             document.getElementById('noteTitle').value = data.translated_title;
                             this.currentNote.title = data.translated_title;
@@ -607,6 +613,11 @@
                         if (data.translated) {
                             document.getElementById('noteContent').value = data.translated;
                             this.currentNote.content = data.translated;
+                        }
+                        if (data.translated_tags) {
+                            // translated_tags expected to be a CSV string like "老师, 指导者, 学校"
+                            document.getElementById('noteTags').value = data.translated_tags;
+                            this.currentNote.tags = data.translated_tags.split(',').map(t => t.trim()).filter(Boolean);
                         }
                         await this.saveNote();
                         this.showMessage('Translation applied and saved.', 'success');
@@ -726,7 +737,7 @@
                              data-note-id="${note.id}" draggable="true">
                             <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                             <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
-                            <div class="note-date">${this.formatDate(note.updated_at)}</div>
+                            <div class="note-date">${this.formatEventDate(note)}</div>
                         </div>
                     `).join('');
 
@@ -985,7 +996,7 @@
                          data-note-id="${note.id}" draggable="true">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
-                        <div class="note-date">${this.formatDate(note.updated_at)}</div>
+                        <div class="note-date">${this.formatEventDate(note)}</div>
                     </div>
                 `).join('');
 
@@ -1014,18 +1025,21 @@
 
             formatDate(dateString) {
                 const date = new Date(dateString);
-                const now = new Date();
-                const diffTime = Math.abs(now - date);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return date.toLocaleString(); // Shows both date and time
+            }
 
-                if (diffDays === 1) {
-                    return 'Today';
-                } else if (diffDays === 2) {
-                    return 'Yesterday';
-                } else if (diffDays <= 7) {
-                    return `${diffDays - 1} days ago`;
+            formatEventDate(note) {
+                // If note has event_date, use it; otherwise fall back to updated_at
+                if (note.event_date) {
+                    let eventDateTime = note.event_date;
+                    if (note.event_time) {
+                        eventDateTime += ' ' + note.event_time;
+                    }
+                    const date = new Date(eventDateTime);
+                    return date.toLocaleString();
                 } else {
-                    return date.toLocaleDateString();
+                    // Fallback to updated_at if no event date
+                    return this.formatDate(note.updated_at);
                 }
             }
         }

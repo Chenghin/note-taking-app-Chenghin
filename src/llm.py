@@ -31,7 +31,7 @@ def translate_text(text, target_language="French"):
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that translates English to other languages.",
+            "content": "You are a helpful assistant that translates text to other languages.",
         },
         {
             "role": "user",
@@ -39,6 +39,99 @@ def translate_text(text, target_language="French"):
         }
     ]
     return call_llm_model(model, messages)
+
+
+def translate_tags(tags, target_language="French"):
+    """Translate a list of tag strings and return a comma-separated string
+    containing only the literal translations (no extra text or punctuation).
+
+    tags: list[str] or comma-separated string
+    returns: string like "老师, 指导者, 学校"
+    """
+    # Normalize tags to a list of plain words
+    if not tags:
+        return ''
+    if isinstance(tags, str):
+        # If tags is a JSON-like string (e.g., '["A","B"]') or CSV, try to parse
+        import json
+        try:
+            parsed = json.loads(tags)
+            if isinstance(parsed, list):
+                tag_list = [t for t in parsed]
+            else:
+                # fallback: split by comma
+                tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+        except Exception:
+            tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+    elif isinstance(tags, list):
+        tag_list = [t for t in tags]
+    else:
+        tag_list = [str(tags)]
+
+    # Translate tags one-by-one to reduce ambiguity and force a single-word response
+    translations = []
+    for tag in tag_list:
+        t = str(tag).strip()
+        if not t:
+            continue
+        # Ask the model to return only the literal translated word
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a strict translator. When asked to translate a single word or short phrase, respond with ONLY the translated word or phrase in the target language. Do NOT add any extra text, explanation, punctuation, or quotes."
+            },
+            {
+                "role": "user",
+                "content": f"Translate the following word to {target_language}: {t}"
+            }
+        ]
+        try:
+            res = call_llm_model(model, messages).strip()
+        except Exception:
+            res = ''
+
+        # Clean the response: remove backticks, surrounding quotes, brackets
+        res = res.replace('`', '').strip()
+        if res.startswith('[') and res.endswith(']'):
+            try:
+                import json
+                parsed = json.loads(res)
+                if isinstance(parsed, list) and parsed:
+                    res = str(parsed[0]).strip()
+            except Exception:
+                # fallback to trimming brackets
+                res = res.lstrip('[').rstrip(']')
+
+        # Remove surrounding quotes
+        if (res.startswith('"') and res.endswith('"')) or (res.startswith("'") and res.endswith("'")):
+            res = res[1:-1].strip()
+
+        # If model returns multiple lines, take first non-empty line
+        if '\n' in res:
+            lines = [l.strip() for l in res.splitlines() if l.strip()]
+            res = lines[0] if lines else res
+
+        translations.append(res)
+
+    # Join translations preserving order, skipping empties
+    cleaned_translations = [s for s in [t.strip() for t in translations] if s]
+    return ', '.join(cleaned_translations)
+
+
+# A function to detect the language of text using the LLM model
+def detect_language(text):
+    """Detect the language of the given text"""
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant that detects the language of text. Respond with only the language name in English (e.g., 'English', 'French', 'Spanish', etc.).",
+        },
+        {
+            "role": "user",
+            "content": f"What language is this text written in? Text: {text}",
+        }
+    ]
+    return call_llm_model(model, messages).strip()
 
 
 def generate_notes_from_title(title, lang="English"):

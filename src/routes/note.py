@@ -126,11 +126,66 @@ def translate_note(note_id):
     data = request.json or {}
     target = data.get('target_language', 'French')
     try:
+        # Check if content is already in target language
+        if not _needs_translation(note.title or '', note.content or '', note.tags or '', target):
+            return jsonify({'no_translation_needed': True}), 200
+            
         translated_title = translate_text(note.title or '', target_language=target)
         translated_content = translate_text(note.content or '', target_language=target)
-        return jsonify({'translated_title': translated_title, 'translated': translated_content}), 200
+        
+        # Translate tags if they exist, extracting only literal words from stored format
+        translated_tags = ''
+        if note.tags:
+            from src.llm import translate_tags
+            # translate_tags will accept list or JSON/string and return cleaned CSV
+            translated_tags = translate_tags(note.tags, target_language=target)
+        
+        return jsonify({
+            'translated_title': translated_title, 
+            'translated': translated_content,
+            'translated_tags': translated_tags
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+def _needs_translation(title, content, tags, target_language):
+    """Check if the content needs translation by detecting if it's already in the target language"""
+    from src.llm import detect_language
+    # Normalize tags into plain text (handle JSON string or list)
+    tags_text = ''
+    if tags:
+        try:
+            if isinstance(tags, str):
+                import json
+                parsed = json.loads(tags)
+                if isinstance(parsed, list):
+                    tags_text = ' '.join([str(t) for t in parsed])
+                else:
+                    tags_text = str(parsed)
+            elif isinstance(tags, list):
+                tags_text = ' '.join([str(t) for t in tags])
+            else:
+                tags_text = str(tags)
+        except Exception:
+            # fallback: treat tags as CSV or plain string
+            if isinstance(tags, str):
+                tags_text = ','.join([t.strip() for t in tags.split(',') if t.strip()])
+            else:
+                tags_text = str(tags)
+
+    # Combine all text for language detection
+    combined_text = f"{title} {content} {tags_text}".strip()
+    if not combined_text:
+        return False
+    
+    try:
+        detected_language = detect_language(combined_text)
+        # Simple check - if detected language matches target, no translation needed
+        return not (detected_language.lower() == target_language.lower())
+    except:
+        # If detection fails, assume translation is needed
+        return True
 
 
 @note_bp.route('/notes/<int:note_id>/generate-tags', methods=['POST'])
