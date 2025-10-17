@@ -4,12 +4,20 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 
-load_dotenv() # Loads environment variables from .env
-token = os.environ["GITHUB_TOKEN"]
+load_dotenv()  # Loads environment variables from .env
+# Do NOT read sensitive environment variables at import time to avoid crashes
+# when the environment variable is not available (for example, on Vercel during build).
 endpoint = "https://models.github.ai/inference"
 model = "openai/gpt-4.1-mini"
 # A function to call an LLM model and return the response
-def call_llm_model(model, messages, temperature=1.0, top_p=1.0): 
+def call_llm_model(model, messages, temperature=1.0, top_p=1.0):
+    # Read token at call time so importing this module doesn't fail when the
+    # environment variable is not present. This prevents serverless function
+    # crashes during startup when secrets are not configured.
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN environment variable is not set. LLM calls require this token.")
+
     client = OpenAI(base_url=endpoint, api_key=token)
     response = client.chat.completions.create(
         messages=messages,
@@ -18,7 +26,11 @@ def call_llm_model(model, messages, temperature=1.0, top_p=1.0):
     return response.choices[0].message.content
 
 # A function to call an LLM model and return the response
-def call_llm_model_raw(model, messages, temperature=1.0, top_p=1.0): 
+def call_llm_model_raw(model, messages, temperature=1.0, top_p=1.0):
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN environment variable is not set. LLM calls require this token.")
+
     client = OpenAI(base_url=endpoint, api_key=token)
     response = client.chat.completions.create(
         messages=messages,
