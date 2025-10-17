@@ -870,6 +870,22 @@
                 this.showEditor();
                 document.getElementById('noteTitle').value = '';
                 document.getElementById('noteContent').value = '';
+                // Clear tags, event date and event time when creating a new note
+                const tagsEl = document.getElementById('noteTags');
+                if (tagsEl) tagsEl.value = '';
+                const dateEl = document.getElementById('eventDate');
+                if (dateEl) {
+                    // If flatpickr instance is attached, clear it properly
+                    if (dateEl._flatpickr) {
+                        dateEl._flatpickr.clear();
+                    } else {
+                        dateEl.value = '';
+                    }
+                }
+                const timeEl = document.getElementById('eventTime');
+                if (timeEl) timeEl.value = '';
+                // Mark form as clean for the new note
+                this.unsavedChanges = false;
                 document.getElementById('editorTitle').textContent = 'New Note';
                 document.getElementById('noteTitle').focus();
                 
