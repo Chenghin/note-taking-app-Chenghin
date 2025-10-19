@@ -80,17 +80,17 @@ And because the button layout is a bit inconsistent, I used the front-end F12 to
 
 ![e0f15b40-2aaa-4fa5-a2b8-fd28e7d56f21](lab2_writeup/e0f15b40-2aaa-4fa5-a2b8-fd28e7d56f21.png)
 
-​	I followed his plan, first downloading the necessary libraries and updating requirements.txt. I then registered on Superbase and set up a database. Initially, I asked him to refactor the app to use Postgres in Supabase (a cloud database), but during testing, I kept getting errors, similar to issues with API key string parsing. I then had him write a program to test the database connection, and it worked.
+​	I followed his plan, first downloading the necessary libraries and updating requirements.txt. I then registered on supabase and set up a database. Initially, I asked him to refactor the app to use Postgres in Supabase (a cloud database), but during testing, I kept getting errors, similar to issues with API key string parsing. I then had him write a program to test the database connection, and it worked.
 
 ![46015e9f76c7b54a56cd10c8d5ffd80f](lab2_writeup/46015e9f76c7b54a56cd10c8d5ffd80f.png)
 
-​	Later, after reading other materials, I found that it was because I did not write the table structure into Superbase, and Superbase cannot directly write the table structure through the API. Therefore, when the AI directly gave him the entire requirement, he did not remind me until I asked him to give me a plan later.
+​	Later, after reading other materials, I found that it was because I did not write the table structure into supabase, and supabase cannot directly write the table structure through the API. Therefore, when the AI directly gave him the entire requirement, he did not remind me until I asked him to give me a plan later.
 
 ![5f01ad148625068ee7710e5f61ffccce](lab2_writeup/5f01ad148625068ee7710e5f61ffccce.png)
 
 ![82a8b7eef26fda20c60b6a61f4d0a10c](lab2_writeup/82a8b7eef26fda20c60b6a61f4d0a10c.png)
 
-​	Then I asked it to help me change the part of the code from sqlite to superbase, and after testing, I found that it was able to connect successfully and write data successfully.
+​	Then I asked it to help me change the part of the code from sqlite to supabase, and after testing, I found that it was able to connect successfully and write data successfully.
 
 ![688ffbe1c776fb74889ad0cb18e7e806](lab2_writeup/688ffbe1c776fb74889ad0cb18e7e806.png)
 
